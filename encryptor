@@ -1,0 +1,75 @@
+const crypto = require("crypto");
+
+async function encryptMessage(txtToEncrypt, passphrase) {
+    try {
+        const saltHex = crypto.randomBytes(16).toString('hex');
+        const ivHex = crypto.randomBytes(16).toString('hex');
+        const salt = Buffer.from(saltHex, 'hex');
+        const iv = Buffer.from(ivHex, 'hex');
+        const sKey = await generateKeyFromPassword(passphrase, salt);
+        const cipher = crypto.createCipheriv('aes-256-cbc', sKey, iv);
+        const encryptedBuffer = Buffer.concat([cipher.update(txtToEncrypt, 'utf-8'), cipher.final()]);
+        const combineData = saltHex + ' ' + ivHex + ' ' + encryptedBuffer.toString('base64');
+        return combineData.replace(/[\n\t\r]/g, '');
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
+
+async function decryptMessage(txtToDecrypt, passphrase) {
+    try {
+        const [saltHex, ivHex, encText] = txtToDecrypt.split(" ");
+        const salt = Buffer.from(saltHex, 'hex');
+        const iv = Buffer.from(ivHex, 'hex');
+        const sKey = await generateKeyFromPassword(passphrase, salt);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', sKey, iv);
+        const decryptedBuffer = Buffer.concat([decipher.update(Buffer.from(encText, 'base64')), decipher.final()]);
+        return decryptedBuffer.toString('utf-8');
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
+
+async function generateKeyFromPassword(password, saltBytes) {
+    return new Promise((resolve, reject) => {
+        crypto.pbkdf2(password, saltBytes, 100, 32, 'sha1', (err, derivedKey) => {
+            if (err) reject(err);
+            else {
+                const secretKey = crypto.createSecretKey(derivedKey);
+                resolve(secretKey);
+            }
+        });
+    });
+}
+
+const txtToEncrypt = 'Hello, World!';
+const txtToDecrypt = '6b16087cc9793055ea9432c3d68b3784 b123aca99b29de0e7cb21cdcb29b6c4a EtOYhOEiV2Oy6sMawUGaQA==';
+const passphrase = 'your-passphrase';
+
+//To Encrypt
+// encryptMessage(txtToEncrypt, passphrase)
+//     .then(result => {
+//         if (result) {
+//             console.log('Encrypted Message:', result);
+//         } else {
+//             console.log('Encryption failed.');
+//         }
+//     })
+//     .catch(err => {
+//         console.error('Error:', err);
+//     });
+
+// To Decrypt
+// decryptMessage(txtToDecrypt, passphrase)
+//     .then(result => {
+//         if (result) {
+//             console.log('Decrypted Message:', result);
+//         } else {
+//             console.log('Decryption failed.');
+//         }
+//     })
+//     .catch(err => {
+//         console.error('Error:', err);
+//     });
